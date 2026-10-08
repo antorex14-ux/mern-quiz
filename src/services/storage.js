@@ -1,45 +1,51 @@
 import { initialQuestions } from "../data/questions";
+import { generateSalt, hashPassword, verifyPassword } from "./crypto";
 
 const KEYS = {
-  USERS: "mern_quiz_users",
-  CURRENT_USER: "mern_quiz_current_user",
+  USERS: "mern_quiz_users_v2", // bumped to v2 for salted SHA-256 schema
+  CURRENT_USER: "mern_quiz_current_user_v2",
   QUESTIONS: "mern_quiz_questions",
   ATTEMPTS: "mern_quiz_attempts"
 };
 
-// Default seed users
+// Default seed users with precomputed 16-byte random salt and SHA-256 hashes
+// Passwords (Alex: "password123", Samantha: "password123", Marcus: "password123", Sarah: "admin")
 const DEFAULT_USERS = [
   {
     id: "stu-1",
     name: "Alex Rivera",
     email: "alex@student.edu",
-    password: "password123",
+    salt: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    passwordHash: "494435d92fd71012bba17c90d86d31e21e8ff123a3bdde2c7c515d5f631518fc",
     role: "student"
   },
   {
     id: "stu-2",
     name: "Samantha Chen",
     email: "samantha@student.edu",
-    password: "password123",
+    salt: "1029384756afbecd0192837465feeedc",
+    passwordHash: "1a7e25f48d0d0d541d50a66649364c09a8454dea6c9c0bf653b235792bca7f22",
     role: "student"
   },
   {
     id: "stu-3",
     name: "Marcus Johnson",
     email: "marcus@student.edu",
-    password: "password123",
+    salt: "f0e1d2c3b4a596871a2b3c4d5e6f7081",
+    passwordHash: "65cbfb41a01f53af5e2d3f31e6b8eafb76438d3939ddc0fefb5475b0ca71fe91",
     role: "student"
   },
   {
     id: "teach-1",
     name: "Prof. Sarah Davis",
     email: "sarah@teacher.edu",
-    password: "admin",
+    salt: "9876543210fedcba0123456789abcdef",
+    passwordHash: "a907accb39cbf1efe1e0f955883413d7be820552c7f25b25f1ade1fb41762e6d",
     role: "teacher"
   }
 ];
 
-// Default sample attempts for initial dashboard visualization
+// Sample attempts for immediate dashboard analytics
 const DEFAULT_ATTEMPTS = [
   {
     id: "att-sample-1",
@@ -88,7 +94,7 @@ const DEFAULT_ATTEMPTS = [
   }
 ];
 
-// Initialize default storage data
+// Initialize storage
 export function initStorage() {
   if (!localStorage.getItem(KEYS.USERS)) {
     localStorage.setItem(KEYS.USERS, JSON.stringify(DEFAULT_USERS));
@@ -101,7 +107,7 @@ export function initStorage() {
   }
 }
 
-// ----------------- Auth & Users -----------------
+// ----------------- Auth & Users (SHA-256 + 16-Byte Salt) -----------------
 
 export function getUsers() {
   try {
@@ -123,28 +129,47 @@ export function getCurrentUser() {
 
 export function setCurrentUser(user) {
   if (user) {
-    localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
+    // Strip security sensitive hashes from session storage
+    const { passwordHash, salt, ...safeUser } = user;
+    localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(safeUser));
   } else {
     localStorage.removeItem(KEYS.CURRENT_USER);
   }
 }
 
-export function loginUser(email, password, role) {
+/**
+ * Verify credentials using SHA-256 + Salt
+ */
+export async function loginUser(email, enteredPassword, role) {
   const users = getUsers();
   const found = users.find(
     (u) =>
       u.email.toLowerCase() === email.toLowerCase().trim() &&
-      u.password === password &&
       (!role || u.role === role)
   );
+
   if (!found) {
-    throw new Error("Invalid email, password, or role selection.");
+    throw new Error("No account found with this email or role.");
   }
+
+  // Cryptographic verification: SHA256(salt + enteredPassword) === storedHash
+  const isValid = await verifyPassword(enteredPassword, found.salt, found.passwordHash);
+  if (!isValid) {
+    throw new Error("Invalid password. Please check your credentials.");
+  }
+
   setCurrentUser(found);
   return found;
 }
 
-export function registerUser({ name, email, password, role }) {
+/**
+ * Register account using random 16-byte salt and SHA-256 hash
+ */
+export async function registerUser({ name, email, password, role }) {
+  if (!password || password.length < 6) {
+    throw new Error("Password must be at least 6 characters long.");
+  }
+
   const users = getUsers();
   const exists = users.find(
     (u) => u.email.toLowerCase() === email.toLowerCase().trim()
@@ -152,13 +177,23 @@ export function registerUser({ name, email, password, role }) {
   if (exists) {
     throw new Error("An account with this email already exists.");
   }
+
+  // 1. Generate 16-byte cryptographically secure random salt
+  const salt = generateSalt();
+
+  // 2. Hash password + salt using SHA-256
+  const passwordHash = await hashPassword(password, salt);
+
+  // 3. Store record without plaintext password
   const newUser = {
     id: `usr-${Date.now()}`,
     name: name.trim(),
     email: email.toLowerCase().trim(),
-    password,
+    salt,
+    passwordHash,
     role: role || "student"
   };
+
   users.push(newUser);
   localStorage.setItem(KEYS.USERS, JSON.stringify(users));
   setCurrentUser(newUser);

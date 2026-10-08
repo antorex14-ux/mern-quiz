@@ -20,7 +20,7 @@ export function AuthModal({ onAuthSuccess }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -31,13 +31,13 @@ export function AuthModal({ onAuthSuccess }) {
         if (!email.trim()) throw new Error("Please enter your email.");
         if (!password) throw new Error("Please enter a password.");
 
-        const user = registerUser({ name, email, password, role });
+        const user = await registerUser({ name, email, password, role });
         onAuthSuccess(user);
       } else {
         if (!email.trim() || !password) {
           throw new Error("Please enter both email and password.");
         }
-        const user = loginUser(email, password, role);
+        const user = await loginUser(email, password, role);
         onAuthSuccess(user);
       }
     } catch (err) {
@@ -48,23 +48,30 @@ export function AuthModal({ onAuthSuccess }) {
   };
 
   // Instant Demo Logins
-  const handleDemoStudent = () => {
+  const handleDemoStudent = async () => {
     try {
-      const user = loginUser("alex@student.edu", "password123", "student");
+      setLoading(true);
+      const user = await loginUser("alex@student.edu", "password123", "student");
       onAuthSuccess(user);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDemoTeacher = () => {
+  const handleDemoTeacher = async () => {
     try {
-      const user = loginUser("sarah@teacher.edu", "admin", "teacher");
+      setLoading(true);
+      const user = await loginUser("sarah@teacher.edu", "admin", "teacher");
       onAuthSuccess(user);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">

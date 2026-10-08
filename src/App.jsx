@@ -46,14 +46,14 @@ export function App() {
   };
 
   // Quick switch role (helper for testing both student & teacher perspectives)
-  const handleQuickSwitchRole = (targetRole) => {
+  const handleQuickSwitchRole = async (targetRole) => {
     try {
       if (targetRole === "teacher") {
-        const teacherUser = loginUser("sarah@teacher.edu", "admin", "teacher");
+        const teacherUser = await loginUser("sarah@teacher.edu", "admin", "teacher");
         setUser(teacherUser);
         setCurrentView("dashboard");
       } else {
-        const studentUser = loginUser("alex@student.edu", "password123", "student");
+        const studentUser = await loginUser("alex@student.edu", "password123", "student");
         setUser(studentUser);
         setCurrentView("dashboard");
       }
@@ -61,6 +61,7 @@ export function App() {
       console.error(e);
     }
   };
+
 
   // Launch Quiz
   const handleStartQuiz = ({ difficulty, topic, count, isTimed, pool }) => {
