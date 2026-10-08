@@ -1,0 +1,31 @@
+name: CI - MERN Quiz Application
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-and-build:
+    name: Verify Security, Questions & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify Hashing & 120 Questions Integrity
+        run: node scripts/verify-checks.js
+
+      - name: Build project with Vite
+        run: npm run build
